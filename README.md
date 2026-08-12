@@ -1,7 +1,9 @@
 # Replication package — A General Theory of Peace, Reconciliation and Memory
 
-Author: Jaime Ramón Fernández Sánchez (jaimewale@hotmail.com)
+Author: Jaime Ramón Fernández Sánchez (jaimeramonfernandezsanchez@gmail.com)
 Working-paper series, 2026. One folder per paper with computational claims.
+Folders 01-13 belong to the peace series; folders 14-15 to the companion
+interpersonal-attention programme.
 
 ## What this is
 
@@ -11,6 +13,22 @@ per paper, each with a fixed random seed and explicit pass/fail assertions
 (exit code 0 = all claims verified). The scripts implement the models exactly as
 stated in the papers and test the theorems against independent oracles
 (grid/LP/backward-induction), not against the formulas being tested.
+
+## Papers on SSRN
+
+| Folder | Paper | SSRN |
+|---|---|---|
+| `01_product_theorem` | Spite, Divisibility and the Existence of Peace: A General Product Theorem | [7248818](https://ssrn.com/abstract=7248818) |
+| `02_endogenous_frontier` | The Endogenous Peace Frontier | [7248820](https://ssrn.com/abstract=7248820) |
+| `03_reconciliation_frontier` | The Reconciliation Frontier | [7248821](https://ssrn.com/abstract=7248821) |
+| `04_unresented_party` | The Unresented Party | [7270178](https://ssrn.com/abstract=7270178) |
+| `05_rows_and_columns` | Rows and Columns: Snidal (1991) in a Bargaining Setting | [7273658](https://ssrn.com/abstract=7273658) |
+| `06_fehr_schmidt` | Fehr–Schmidt as a Piecewise Spite Model | [7273438](https://ssrn.com/abstract=7273438) |
+| `14_normalization_attention_budget`, `15_representation_theorem` | Normalization as an Attention Budget: A Representation Theorem and a Test | [7272879](https://ssrn.com/abstract=7272879) |
+
+Bilateral predecessor: Spite and the Bargaining Model of War
+([7211638](https://ssrn.com/abstract=7211638)). Folders 07-13 accompany papers of
+the series not yet deposited.
 
 ## Contents
 
@@ -26,7 +44,9 @@ stated in the papers and test the theorems against independent oracles
 - 10_network_in_motion     — multilateral ripeness bound, settlement before ripeness, mildness boundary
 - 11_manufacture_of_grievance — cliff structure, two stable regimes, hawk basin in w (implements the v1.1 correction)
 - 12_whose_utilities_count — the two Paretos part company; scorched-earth refusal
-- 13_thucydides_coordinate — original scripts of the final paper: exact one-step condition (0/17,577-class batteries), general path characterization, patient limit, width identity (symbolic), gradualism, endogenous fear
+- 13_thucydides_coordinate — exact one-step condition, general path characterization, patient limit, width identity (symbolic), gradualism, endogenous fear
+- 14_normalization_attention_budget — interpersonal attention: FS marginal condition, Snidal inertness, weighted marginal condition and zero-column inertness
+- 15_representation_theorem — interpersonal attention: A4 identity, piecewise FS closed form (Theorem 3), elicitation identities, discriminating power of the population test
 
 ## How to run
 
@@ -47,3 +67,8 @@ The series' practice of reporting its own falsifications is preserved here: the
 comments in folders 11 and 13 document the two claims that verification killed
 (v1.0's supermodularity framing of the grievance game; the per-period-speed form
 of the Thucydides conjecture) and what replaced them.
+
+## License
+
+MIT (see `LICENSE`). Please cite the relevant paper rather than the repository.
+
