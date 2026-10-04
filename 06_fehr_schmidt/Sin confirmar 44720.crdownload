@@ -1,0 +1,327 @@
+"""
+Mathematical checks for "Fehr–Schmidt as a Piecewise Spite Model:
+Local Incentives, Reference Weights, and the Limits of Group-Size Invariance" (v1.3).
+
+Each check verifies an identity stated in the paper. These are implementation
+checks of the algebra, not evidence about behavior.
+
+Run:  python verify_math.py          (writes math_checks.json next to this file)
+Requires: numpy (tested with Python 3.10+).
+"""
+import json
+import math
+import os
+import sys
+
+import numpy as np
+
+SEED = 20261003
+rng = np.random.default_rng(SEED)
+RESULTS = {}
+
+
+def record(name, statement, passed, **details):
+    RESULTS[name] = {"statement": statement, "passed": bool(passed), **details}
+    print(f"[{'PASS' if passed else 'FAIL'}] {name}")
+
+
+def draw_params():
+    """0 <= beta < 1 and alpha >= beta, as in Section 2."""
+    beta = rng.uniform(0.0, 0.95)
+    alpha = beta + rng.uniform(0.0, 3.0)
+    return alpha, beta
+
+
+# ---------------------------------------------------------------- utilities
+def fs_utility(x, i, alpha, beta, w=None):
+    """Fehr–Schmidt utility of player i at payoff vector x.
+    w: optional comparison weights over the others (summing to one);
+    default is the uniform 1/(n-1) average of the canonical specification."""
+    n = len(x)
+    others = np.delete(np.arange(n), i)
+    d = x[others] - x[i]
+    if w is None:
+        w = np.full(n - 1, 1.0 / (n - 1))
+    return x[i] - alpha * np.sum(w * np.maximum(d, 0)) - beta * np.sum(w * np.maximum(-d, 0))
+
+
+def pg_ineq_part(gi, g_others, alpha, beta, m, e, w=None):
+    """Public-goods utility of i as a function of own contribution gi, dropping the
+    constant m * sum(g_others), which does not depend on gi. With equal endowments
+    x_j - x_i = gi - g_j, so the inequality terms depend on contributions only."""
+    k = len(g_others)
+    if w is None:
+        w = np.full(k, 1.0 / k)
+    d = gi - g_others  # = x_j - x_i
+    return (e - gi + m * gi) - alpha * np.sum(w * np.maximum(d, 0)) - beta * np.sum(w * np.maximum(-d, 0))
+
+
+def pg_full_utility(gi, g_others, alpha, beta, m, e):
+    return pg_ineq_part(gi, g_others, alpha, beta, m, e) + m * np.sum(g_others)
+
+
+# ---------------------------------------------------------------- Lemma 1
+def check_lemma1(trials=2000):
+    worst = 0.0
+    bound_ok = True
+    cycle_ok = True
+    for _ in range(trials):
+        n = int(rng.integers(2, 60))
+        x = rng.permutation(rng.uniform(0, 100, n))  # strict ordering almost surely
+        i = int(rng.integers(n))
+        alpha, beta = draw_params()
+        others = np.delete(np.arange(n), i)
+        above = x[others] > x[i]
+        a = above.mean()
+        b = 1 - a
+        c = 1 + alpha * a - beta * b
+        lam = np.where(above, alpha / ((n - 1) * c), -beta / ((n - 1) * c))
+        rep = c * (x[i] - np.sum(lam * x[others]))
+        worst = max(worst, abs(rep - fs_utility(x, i, alpha, beta)))
+        # positive entries sum to alpha*a/c < 1
+        if not (alpha * a / c < 1 and np.all(lam[lam > 0] < 1)):
+            bound_ok = False
+        # signed row sum formula
+        k = (alpha * a - beta * b) / c
+        if abs(k - lam.sum()) > 1e-12:
+            bound_ok = False
+    # positive edges point strictly upward in payoffs, so they form no directed cycle
+    for _ in range(300):
+        n = int(rng.integers(3, 25))
+        x = rng.permutation(rng.uniform(0, 100, n))
+        edges = [(i, j) for i in range(n) for j in range(n) if i != j and x[j] > x[i]]
+        if any(x[j] <= x[i] for i, j in edges):
+            cycle_ok = False
+        # reciprocal pairs have nonpositive product (one positive, one negative entry)
+        for i in range(n):
+            for j in range(i + 1, n):
+                if (x[j] > x[i]) == (x[i] > x[j]):
+                    cycle_ok = False
+    record("lemma1_piecewise_reduction",
+           "On a strict payoff-ordering region, FS utility equals c_i[x_i - sum_j lambda_ij x_j] with the stated lambda_ij.",
+           worst < 1e-9, trials=trials, max_abs_discrepancy=worst)
+    record("lemma1_row_sum_and_positive_bound",
+           "Signed row sum k_i = (alpha a - beta b)/c_i; positive entries sum to alpha a/c_i < 1, so each is below one.",
+           bound_ok, trials=trials)
+    record("lemma1_no_positive_cycle",
+           "Positive edges point strictly upward in payoffs (no directed cycle); reciprocal pairs have nonpositive product.",
+           cycle_ok)
+
+
+# ---------------------------------------------------------------- Proposition 2
+def check_prop2(profiles=500, sizes=(4, 10, 40, 200, 1000)):
+    e = 10.0
+    per_size = {}
+    overall = 0.0
+    for n in sizes:
+        worst = 0.0
+        done = 0
+        while done < profiles:
+            m = rng.uniform(1.0 / n + 1e-3, 0.999)
+            alpha, beta = draw_params()
+            g_others = rng.uniform(0, e, n - 1)
+            gi = rng.uniform(0, e)
+            gap = np.min(np.abs(g_others - gi))
+            if gap < 1e-4 or gi < 1e-4 or gi > e - 1e-4:
+                continue  # stay away from kinks and bounds
+            h = min(1e-6, 0.25 * gap)
+            num = (pg_ineq_part(gi + h, g_others, alpha, beta, m, e)
+                   - pg_ineq_part(gi - h, g_others, alpha, beta, m, e)) / (2 * h)
+            phi = np.mean(g_others < gi)
+            psi = np.mean(g_others > gi)
+            formula = (m - 1) - alpha * phi + beta * psi
+            worst = max(worst, abs(num - formula))
+            done += 1
+        per_size[str(n)] = worst
+        overall = max(overall, worst)
+    record("prop2_derivative_vs_numerical",
+           "Away from ties, dU_i/dg_i = (m-1) - alpha*phi_i + beta*psi_i; compared with central differences.",
+           overall < 1.3e-8, profiles_per_size=profiles, sizes=list(sizes),
+           max_abs_discrepancy_by_size=per_size, max_abs_discrepancy=overall,
+           paper_bound=1.3e-8)
+
+
+def check_ties(trials=500):
+    e = 10.0
+    worst = 0.0
+    for _ in range(trials):
+        n = int(rng.integers(3, 80))
+        m = rng.uniform(1.0 / n + 1e-3, 0.999)
+        alpha, beta = draw_params()
+        grid = np.round(rng.uniform(0.5, e - 0.5, 6), 3)
+        g_others = rng.choice(grid, n - 1)
+        gi = float(rng.choice(g_others))  # at least one tie
+        h = 1e-6
+        f0 = pg_ineq_part(gi, g_others, alpha, beta, m, e)
+        left = (f0 - pg_ineq_part(gi - h, g_others, alpha, beta, m, e)) / h
+        right = (pg_ineq_part(gi + h, g_others, alpha, beta, m, e) - f0) / h
+        phi = np.mean(g_others < gi)
+        psi = np.mean(g_others > gi)
+        tau = np.mean(g_others == gi)
+        d_minus = (m - 1) - alpha * phi + beta * (psi + tau)
+        d_plus = (m - 1) - alpha * (phi + tau) + beta * psi
+        worst = max(worst, abs(left - d_minus), abs(right - d_plus))
+    record("prop2_one_sided_derivatives_at_ties",
+           "At a tie, D- = (m-1) - alpha*phi + beta*(psi+tau) and D+ = (m-1) - alpha*(phi+tau) + beta*psi.",
+           worst < 1e-6, trials=trials, max_abs_discrepancy=worst)
+
+
+# ---------------------------------------------------------------- Corollary 3
+def check_replication(trials=300, grid_points=201):
+    e = 10.0
+    worst = 0.0
+    for _ in range(trials):
+        n = int(rng.integers(3, 30))
+        m_ret = rng.uniform(0.05, 0.999)  # held fixed across group sizes
+        alpha, beta = draw_params()
+        g_others = rng.uniform(0, e, n - 1)
+        k = int(rng.integers(2, 12))
+        g_rep = np.tile(g_others, k)
+        grid = np.linspace(0, e, grid_points)
+        u1 = np.array([pg_full_utility(g, g_others, alpha, beta, m_ret, e) for g in grid])
+        u2 = np.array([pg_full_utility(g, g_rep, alpha, beta, m_ret, e) for g in grid])
+        diffs1 = u1 - u1[0]
+        diffs2 = u2 - u2[0]
+        worst = max(worst, float(np.max(np.abs(diffs1 - diffs2))))
+    record("cor3_replication_invariance",
+           "Replacing every other player's contribution by k identical copies preserves every comparison between i's possible contributions (including across rank boundaries).",
+           worst < 1e-9, trials=trials, grid_points=grid_points, max_abs_discrepancy=worst)
+
+
+# ---------------------------------------------------------------- equilibrium example
+def check_equilibrium_example(trials=400):
+    e = 10.0
+    ok = True
+    for _ in range(trials):
+        n = int(rng.integers(2, 12))
+        m = rng.uniform(1.0 / n + 1e-3, 0.999)
+        alpha, beta = draw_params()
+        c = rng.uniform(0.5, e)
+        g_others = np.full(n - 1, c)
+        grid = np.unique(np.concatenate([np.linspace(0, e, 2001), [c]]))
+        u = np.array([pg_ineq_part(g, g_others, alpha, beta, m, e) for g in grid])
+        is_br = pg_ineq_part(c, g_others, alpha, beta, m, e) >= u.max() - 1e-10
+        if is_br != (beta >= 1 - m):
+            ok = False
+        # zero profile is always an equilibrium
+        z = np.zeros(n - 1)
+        uz = np.array([pg_ineq_part(g, z, alpha, beta, m, e) for g in grid])
+        if pg_ineq_part(0.0, z, alpha, beta, m, e) < uz.max() - 1e-10:
+            ok = False
+    p = 0.9
+    probs = {"n=4": p ** 4, "n=40": p ** 40}
+    ok_nums = abs(probs["n=4"] - 0.6561) < 1e-12 and abs(probs["n=40"] - 0.0148) < 5e-5
+    record("symmetric_equilibrium_condition",
+           "A common positive contribution c is a best response for everyone exactly when beta_i >= 1-m; the zero profile is always an equilibrium (brute-force best responses on a grid).",
+           ok, trials=trials)
+    record("symmetric_equilibrium_probabilities",
+           "With P(beta_i >= 1-m) = 0.9 and independent types, P(positive symmetric equilibrium exists) = 0.9^n: 0.6561 at n=4, about 0.0148 at n=40.",
+           ok_nums, values=probs)
+
+
+# ---------------------------------------------------------------- sampling variance
+def check_sampling_variance(reps=40000):
+    out = {}
+    ok = True
+    for n in (4, 10, 40):
+        F = 0.37
+        draws = rng.random((reps, n - 1)) < F
+        frac = draws.mean(axis=1)
+        theory = F * (1 - F) / (n - 1)
+        sim = frac.var()
+        out[str(n)] = {"simulated": sim, "theory": theory}
+        if abs(sim - theory) / theory > 0.05:
+            ok = False
+    record("population_sampling_variance",
+           "With independent draws and no atom at g_i, the fraction below g_i has mean F(g_i) and variance F(1-F)/(n-1).",
+           ok, F=0.37, replications=reps, by_size=out)
+
+
+# ---------------------------------------------------------------- Proposition 4 and entrant formula
+def weighted_check(trials=400):
+    e = 10.0
+    worst = 0.0
+    worst_entry = 0.0
+    for _ in range(trials):
+        n = int(rng.integers(3, 60))
+        m = rng.uniform(1.0 / n + 1e-3, 0.999)
+        alpha, beta = draw_params()
+        g_others = rng.uniform(0, e, n - 1)
+        w = rng.dirichlet(np.ones(n - 1))
+        gi = rng.uniform(0.5, e - 0.5)
+        gap = np.min(np.abs(g_others - gi))
+        if gap < 1e-4:
+            continue
+        h = min(1e-6, 0.25 * gap)
+        num = (pg_ineq_part(gi + h, g_others, alpha, beta, m, e, w)
+               - pg_ineq_part(gi - h, g_others, alpha, beta, m, e, w)) / (2 * h)
+        Phi = np.sum(w[g_others < gi])
+        Psi = np.sum(w[g_others > gi])
+        D = (m - 1) - alpha * Phi + beta * Psi
+        worst = max(worst, abs(num - D))
+        # entrant with weight eta; old weights scaled by 1-eta
+        eta = rng.uniform(0.01, 0.9)
+        g_new = rng.uniform(0, e)
+        if abs(g_new - gi) < 1e-4:
+            continue
+        w2 = np.concatenate([(1 - eta) * w, [eta]])
+        g2 = np.concatenate([g_others, [g_new]])
+        Phi2 = np.sum(w2[g2 < gi])
+        Psi2 = np.sum(w2[g2 > gi])
+        D2 = (m - 1) - alpha * Phi2 + beta * Psi2
+        dD = eta * (-alpha * ((g_new < gi) - Phi) + beta * ((g_new > gi) - Psi))
+        worst_entry = max(worst_entry, abs((D2 - D) - dD))
+    record("prop4_weighted_derivative",
+           "With fixed weights summing to one, dU_i/dg_i = (m-1) - alpha*Phi_i + beta*Psi_i away from ties.",
+           worst < 1e-8, trials=trials, max_abs_discrepancy=worst)
+    record("prop4_entrant_change",
+           "Adding a counterpart with weight eta and rescaling old weights by 1-eta changes the incentive by eta[-alpha(1{g_new<g_i}-Phi_i) + beta(1{g_new>g_i}-Psi_i)].",
+           worst_entry < 1e-12, max_abs_discrepancy=worst_entry)
+
+
+# ---------------------------------------------------------------- Section 8
+def check_general_benefit(trials=300):
+    ok = True
+    for _ in range(trials):
+        n = int(rng.integers(2, 30))
+        e = 10.0
+        g = rng.uniform(0, e, n)
+        a, b = rng.uniform(0.1, 5, 2)
+        B = a * math.log1p(b * g.sum())  # any common differentiable benefit
+        x = e - g + B
+        for i in range(n):
+            if not np.allclose(x - x[i], g[i] - g, atol=1e-12):
+                ok = False
+    record("sec8_general_common_benefit",
+           "With x_i = e - g_i + B(sum g) and a common benefit B, x_j - x_i = g_i - g_j still holds.",
+           ok, trials=trials)
+
+
+def main():
+    print(f"numpy {np.__version__}, python {sys.version.split()[0]}, seed {SEED}")
+    check_lemma1()
+    check_prop2()
+    check_ties()
+    check_replication()
+    check_equilibrium_example()
+    check_sampling_variance()
+    weighted_check()
+    check_general_benefit()
+    summary = {
+        "paper": "Fehr–Schmidt as a Piecewise Spite Model: Local Incentives, Reference Weights, and the Limits of Group-Size Invariance",
+        "version": "v1.3",
+        "seed": SEED,
+        "numpy": np.__version__,
+        "python": sys.version.split()[0],
+        "all_passed": all(r["passed"] for r in RESULTS.values()),
+        "checks": RESULTS,
+    }
+    out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "math_checks.json")
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump(summary, f, indent=2, ensure_ascii=False, default=float)
+    print("ALL PASSED" if summary["all_passed"] else "SOME CHECKS FAILED")
+    return 0 if summary["all_passed"] else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

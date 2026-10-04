@@ -1,0 +1,108 @@
+{
+  "paper": "Fehr–Schmidt as a Piecewise Spite Model: Local Incentives, Reference Weights, and the Limits of Group-Size Invariance",
+  "version": "v1.3",
+  "seed": 20261003,
+  "numpy": "2.5.3",
+  "python": "3.13.16",
+  "all_passed": true,
+  "checks": {
+    "lemma1_piecewise_reduction": {
+      "statement": "On a strict payoff-ordering region, FS utility equals c_i[x_i - sum_j lambda_ij x_j] with the stated lambda_ij.",
+      "passed": true,
+      "trials": 2000,
+      "max_abs_discrepancy": 8.526512829121202e-14
+    },
+    "lemma1_row_sum_and_positive_bound": {
+      "statement": "Signed row sum k_i = (alpha a - beta b)/c_i; positive entries sum to alpha a/c_i < 1, so each is below one.",
+      "passed": true,
+      "trials": 2000
+    },
+    "lemma1_no_positive_cycle": {
+      "statement": "Positive edges point strictly upward in payoffs (no directed cycle); reciprocal pairs have nonpositive product.",
+      "passed": true
+    },
+    "prop2_derivative_vs_numerical": {
+      "statement": "Away from ties, dU_i/dg_i = (m-1) - alpha*phi_i + beta*psi_i; compared with central differences.",
+      "passed": true,
+      "profiles_per_size": 500,
+      "sizes": [
+        4,
+        10,
+        40,
+        200,
+        1000
+      ],
+      "max_abs_discrepancy_by_size": {
+        "4": 4.61547955410424e-09,
+        "10": 4.952553034343055e-09,
+        "40": 4.959977761842538e-09,
+        "200": 3.941609705293558e-09,
+        "1000": 4.168140499416495e-09
+      },
+      "max_abs_discrepancy": 4.959977761842538e-09,
+      "paper_bound": 1.3e-08
+    },
+    "prop2_one_sided_derivatives_at_ties": {
+      "statement": "At a tie, D- = (m-1) - alpha*phi + beta*(psi+tau) and D+ = (m-1) - alpha*(phi+tau) + beta*psi.",
+      "passed": true,
+      "trials": 500,
+      "max_abs_discrepancy": 7.077215258277647e-09
+    },
+    "cor3_replication_invariance": {
+      "statement": "Replacing every other player's contribution by k identical copies preserves every comparison between i's possible contributions (including across rank boundaries).",
+      "passed": true,
+      "trials": 300,
+      "grid_points": 201,
+      "max_abs_discrepancy": 2.1316282072803006e-13
+    },
+    "symmetric_equilibrium_condition": {
+      "statement": "A common positive contribution c is a best response for everyone exactly when beta_i >= 1-m; the zero profile is always an equilibrium (brute-force best responses on a grid).",
+      "passed": true,
+      "trials": 400
+    },
+    "symmetric_equilibrium_probabilities": {
+      "statement": "With P(beta_i >= 1-m) = 0.9 and independent types, P(positive symmetric equilibrium exists) = 0.9^n: 0.6561 at n=4, about 0.0148 at n=40.",
+      "passed": true,
+      "values": {
+        "n=4": 0.6561,
+        "n=40": 0.014780882941434608
+      }
+    },
+    "population_sampling_variance": {
+      "statement": "With independent draws and no atom at g_i, the fraction below g_i has mean F(g_i) and variance F(1-F)/(n-1).",
+      "passed": true,
+      "F": 0.37,
+      "replications": 40000,
+      "by_size": {
+        "4": {
+          "simulated": 0.07746194270833334,
+          "theory": 0.0777
+        },
+        "10": {
+          "simulated": 0.025961955054012345,
+          "theory": 0.0259
+        },
+        "40": {
+          "simulated": 0.005984703484549639,
+          "theory": 0.005976923076923077
+        }
+      }
+    },
+    "prop4_weighted_derivative": {
+      "statement": "With fixed weights summing to one, dU_i/dg_i = (m-1) - alpha*Phi_i + beta*Psi_i away from ties.",
+      "passed": true,
+      "trials": 400,
+      "max_abs_discrepancy": 3.5011074039914547e-09
+    },
+    "prop4_entrant_change": {
+      "statement": "Adding a counterpart with weight eta and rescaling old weights by 1-eta changes the incentive by eta[-alpha(1{g_new<g_i}-Phi_i) + beta(1{g_new>g_i}-Psi_i)].",
+      "passed": true,
+      "max_abs_discrepancy": 1.27675647831893e-15
+    },
+    "sec8_general_common_benefit": {
+      "statement": "With x_i = e - g_i + B(sum g) and a common benefit B, x_j - x_i = g_i - g_j still holds.",
+      "passed": true,
+      "trials": 300
+    }
+  }
+}
